@@ -17,9 +17,11 @@
           <p class="eyebrow">Customs</p>
           <h1>Install Gate Evidence</h1>
           <p class="summary">
-            Static proof snapshot for the hackathon demo. Customs blocks
+            Operational evidence for the Customs install gate. Customs blocks
             poisoned package lifecycle hooks before they run and emits an
-            offline-verifiable Ed25519 receipt.
+            offline-verifiable Ed25519 receipt. This page reflects a
+            controlled-fixture verification path, not production package
+            traffic.
           </p>
         </div>
         <nav class="actions" aria-label="Primary links">
@@ -119,7 +121,7 @@
           <dl class="receipt-list">
             <div>
               <dt>Package</dt>
-              <dd>@customs-demo/poisoned-postinstall</dd>
+              <dd>controlled poisoned-postinstall fixture</dd>
             </div>
             <div>
               <dt>Actor class</dt>
@@ -127,7 +129,7 @@
             </div>
             <div>
               <dt>Delegation</dt>
-              <dd>chain:customs-demo</dd>
+              <dd>trusted local agent chain</dd>
             </div>
             <div>
               <dt>Hash-chain entry</dt>
@@ -153,23 +155,23 @@
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Verification path</p>
-            <h2>What Judges Can Reproduce</h2>
+            <h2>Verification Runbook</h2>
           </div>
-          <span class="pill">local first</span>
+          <span class="pill">offline verifiable</span>
         </div>
         <div class="proof-grid">
-          <pre><code>npm run demo:poisoned-install
-npm run customs:verify-receipt -- artifacts/poisoned-install-receipt.json --trusted-public-key artifacts/customs-issuer-public.jwk.json
-npm run release:smoke</code></pre>
+          <pre><code>npm run release:smoke
+npm run customs:verify-receipt -- artifacts/poisoned-install-receipt.json --trusted-public-key artifacts/customs-issuer-public.jwk.json</code></pre>
           <div class="proof-copy">
             <p>
-              The demo package writes <code>POSTINSTALL_RAN.txt</code> only if
-              its lifecycle script executes. A passing Customs run denies the
-              install, keeps the marker absent, writes the receipt, and verifies
-              it against an out-of-band trusted public key.
+              The controlled test package writes
+              <code>POSTINSTALL_RAN.txt</code> only if its lifecycle script
+              executes. A passing Customs run denies the install, keeps the
+              marker absent, writes the receipt, and verifies it against an
+              out-of-band trusted public key.
             </p>
             <p>
-              Pitch-safe claim: Customs gates install-lifecycle execution and
+              Product claim: Customs gates install-lifecycle execution and
               blocks Clinejection/Nx-style poisoned lifecycle hooks before they
               run.
             </p>
@@ -192,7 +194,7 @@ npm run release:smoke</code></pre>
           </div>
           <div>
             <span>Merge</span>
-            <strong>8ac7821</strong>
+            <strong>8251d29</strong>
           </div>
           <div>
             <span>CI</span>
