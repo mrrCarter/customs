@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Customs Install Gate Evidence</title>
+    <meta
+      name="description"
+      content="Customs evidence dashboard for install-lifecycle poisoned package blocking, signed receipts, and red-team replay scope."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar" aria-label="Customs evidence summary">
+        <div>
+          <p class="eyebrow">Customs</p>
+          <h1>Install Gate Evidence</h1>
+          <p class="summary">
+            Static proof snapshot for the hackathon demo. Customs blocks
+            poisoned package lifecycle hooks before they run and emits an
+            offline-verifiable Ed25519 receipt.
+          </p>
+        </div>
+        <nav class="actions" aria-label="Primary links">
+          <a href="https://dashboard.aidenid.com">AIdenID dashboard</a>
+          <a href="https://github.com/mrrCarter/customs">GitHub repo</a>
+        </nav>
+      </header>
+
+      <section class="status-grid" aria-label="Current proof status">
+        <article class="status-card good">
+          <span>Install decision</span>
+          <strong>deny</strong>
+          <small>poisoned_postinstall_detected</small>
+        </article>
+        <article class="status-card good">
+          <span>Lifecycle execution</span>
+          <strong>false</strong>
+          <small>postinstall marker did not appear</small>
+        </article>
+        <article class="status-card good">
+          <span>Receipt verification</span>
+          <strong>ok</strong>
+          <small>trusted public key required</small>
+        </article>
+        <article class="status-card warn">
+          <span>Scope boundary</span>
+          <strong>install</strong>
+          <small>runtime import gate is not claimed</small>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <article class="panel attack-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Red-team replay</p>
+              <h2>Attack Corpus</h2>
+            </div>
+            <span class="pill">4 cases</span>
+          </div>
+          <div class="attack-list">
+            <div class="attack-row blocked">
+              <span class="attack-id">P1</span>
+              <div>
+                <strong>Clinejection-style postinstall RCE</strong>
+                <p>
+                  Control install executes the marker. Customs stages with
+                  ignore-scripts, denies, and writes a receipt.
+                </p>
+              </div>
+              <span class="decision">blocked</span>
+            </div>
+            <div class="attack-row blocked">
+              <span class="attack-id">P2</span>
+              <div>
+                <strong>Nx telemetry-style secret scan</strong>
+                <p>
+                  Poisoned postinstall scanner is denied before it can inspect
+                  the environment.
+                </p>
+              </div>
+              <span class="decision">blocked</span>
+            </div>
+            <div class="attack-row blocked">
+              <span class="attack-id">B1</span>
+              <div>
+                <strong>Hook-alias lifecycle payload</strong>
+                <p>
+                  preinstall and prepare aliases are treated as denied lifecycle
+                  surface.
+                </p>
+              </div>
+              <span class="decision">blocked</span>
+            </div>
+            <div class="attack-row scoped">
+              <span class="attack-id">B5</span>
+              <div>
+                <strong>Import-time payload</strong>
+                <p>
+                  Recorded as a scope gap. No install lifecycle hook means
+                  Customs does not claim runtime blocking yet.
+                </p>
+              </div>
+              <span class="decision">gap</span>
+            </div>
+          </div>
+        </article>
+
+        <aside class="panel receipt-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Signed artifact</p>
+              <h2>Receipt</h2>
+            </div>
+            <span class="pill good-pill">verified</span>
+          </div>
+          <dl class="receipt-list">
+            <div>
+              <dt>Package</dt>
+              <dd>@customs-demo/poisoned-postinstall</dd>
+            </div>
+            <div>
+              <dt>Actor class</dt>
+              <dd>verified_agent</dd>
+            </div>
+            <div>
+              <dt>Delegation</dt>
+              <dd>chain:customs-demo</dd>
+            </div>
+            <div>
+              <dt>Hash-chain entry</dt>
+              <dd>
+                <code
+                  >2a0eac49708a78553fd5d5163998cac5774f0e270ab7671d25de4829afeedcb0</code
+                >
+              </dd>
+            </div>
+            <div>
+              <dt>Issuer key</dt>
+              <dd>
+                <code
+                  >customs-ed25519-OqDhbB0BteFWriKm3rP0gf31uo8F1m3Jr2FlJ0blqic</code
+                >
+              </dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+
+      <section class="panel proof-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Verification path</p>
+            <h2>What Judges Can Reproduce</h2>
+          </div>
+          <span class="pill">local first</span>
+        </div>
+        <div class="proof-grid">
+          <pre><code>npm run demo:poisoned-install
+npm run customs:verify-receipt -- artifacts/poisoned-install-receipt.json --trusted-public-key artifacts/customs-issuer-public.jwk.json
+npm run release:smoke</code></pre>
+          <div class="proof-copy">
+            <p>
+              The demo package writes <code>POSTINSTALL_RAN.txt</code> only if
+              its lifecycle script executes. A passing Customs run denies the
+              install, keeps the marker absent, writes the receipt, and verifies
+              it against an out-of-band trusted public key.
+            </p>
+            <p>
+              Pitch-safe claim: Customs gates install-lifecycle execution and
+              blocks Clinejection/Nx-style poisoned lifecycle hooks before they
+              run.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel release-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Release evidence</p>
+            <h2>Current Main</h2>
+          </div>
+          <span class="pill good-pill">green</span>
+        </div>
+        <div class="release-grid">
+          <div>
+            <span>Branch</span>
+            <strong>main</strong>
+          </div>
+          <div>
+            <span>Merge</span>
+            <strong>8ac7821</strong>
+          </div>
+          <div>
+            <span>CI</span>
+            <strong>success</strong>
+          </div>
+          <div>
+            <span>Release YAML</span>
+            <strong>parse fixed</strong>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
