@@ -1,4 +1,4 @@
-name: Omar Gate (BYOK Mode)
+name: Omar Gate (Managed PR + BYOK Manual)
 
 on:
   pull_request:
@@ -62,11 +62,26 @@ jobs:
           set -euo pipefail
           if [ -z "${SENTINELAYER_TOKEN}" ]; then
             echo "::warning::SENTINELAYER_TOKEN not set. Set it with: gh secret set SENTINELAYER_TOKEN --body <your-token>"
-            echo "Skipping Omar Gate scan — run locally with: npx sentinelayer-cli@latest /omargate deep --path ."
+            echo "Skipping Omar Gate scan - run locally with: npx sentinelayer-cli@latest /omargate deep --path ."
             exit 0
           fi
-      - name: Run Omar Gate
-        id: omar
+      - name: Run Omar Gate (PR managed)
+        if: github.event_name == 'pull_request'
+        id: omar_pr
+        uses: mrrCarter/sentinelayer-v1-action@03d7369cba7de2e9f15b959275c982111f0ee493
+        with:
+          github_token: ${{ github.token }}
+          sentinelayer_token: ${{ secrets.SENTINELAYER_TOKEN }}
+          sentinelayer_managed_llm: "true"
+          scan_mode: deep
+          severity_gate: P1
+          model: gpt-5.3-codex
+          codex_model: gpt-5.3-codex
+          model_fallback: gemini-2.5-flash
+          llm_failure_policy: block
+      - name: Run Omar Gate (manual BYOK)
+        if: github.event_name == 'workflow_dispatch'
+        id: omar_manual
         uses: mrrCarter/sentinelayer-v1-action@03d7369cba7de2e9f15b959275c982111f0ee493
         with:
           github_token: ${{ github.token }}
@@ -74,12 +89,32 @@ jobs:
           sentinelayer_managed_llm: "false"
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-          scan_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_mode || 'deep' }}
-          severity_gate: ${{ github.event_name == 'workflow_dispatch' && inputs.severity_gate || 'P1' }}
+          scan_mode: ${{ inputs.scan_mode }}
+          severity_gate: ${{ inputs.severity_gate }}
           model: gpt-5.3-codex
           codex_model: gpt-5.3-codex
           model_fallback: gemini-2.5-flash
           llm_failure_policy: block
+      - name: Normalize Omar outputs
+        id: omar
+        shell: bash
+        env:
+          RUN_ID: ${{ steps.omar_pr.outputs.run_id || steps.omar_manual.outputs.run_id || '' }}
+          GATE_STATUS: ${{ steps.omar_pr.outputs.gate_status || steps.omar_manual.outputs.gate_status || '' }}
+          P0_COUNT: ${{ steps.omar_pr.outputs.p0_count || steps.omar_manual.outputs.p0_count || '0' }}
+          P1_COUNT: ${{ steps.omar_pr.outputs.p1_count || steps.omar_manual.outputs.p1_count || '0' }}
+          P2_COUNT: ${{ steps.omar_pr.outputs.p2_count || steps.omar_manual.outputs.p2_count || '0' }}
+          P3_COUNT: ${{ steps.omar_pr.outputs.p3_count || steps.omar_manual.outputs.p3_count || '0' }}
+        run: |
+          set -euo pipefail
+          {
+            echo "run_id=${RUN_ID}"
+            echo "gate_status=${GATE_STATUS}"
+            echo "p0_count=${P0_COUNT}"
+            echo "p1_count=${P1_COUNT}"
+            echo "p2_count=${P2_COUNT}"
+            echo "p3_count=${P3_COUNT}"
+          } >> "$GITHUB_OUTPUT"
       - name: Enforce Omar reviewer merge thresholds
         shell: bash
         env:
@@ -125,6 +160,7 @@ jobs:
           OMAR_SCAN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_mode || 'deep' }}
           OMAR_SEVERITY_GATE: ${{ github.event_name == 'workflow_dispatch' && inputs.severity_gate || 'P1' }}
           OMAR_P2_MAX_ALLOWED: ${{ github.event_name == 'workflow_dispatch' && inputs.p2_max_allowed || '5' }}
+          OMAR_MANAGED_LLM: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
         run: |
           set -euo pipefail
           mkdir -p omar-artifacts
@@ -162,7 +198,7 @@ jobs:
               "scan": {
                   "mode": env("OMAR_SCAN_MODE", "deep"),
                   "action_ref": "mrrCarter/sentinelayer-v1-action@03d7369cba7de2e9f15b959275c982111f0ee493",
-                  "managed_llm": False,
+                  "managed_llm": env("OMAR_MANAGED_LLM", "false").lower() == "true",
                   "llm_failure_policy": "block",
               },
               "github": {
