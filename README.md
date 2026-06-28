@@ -1,6 +1,6 @@
 # Customs
 
-Local clearance layer for autonomous software actions. V1 proves a package-install gate: inspect before lifecycle execution, block poisoned lifecycle hooks from package directories or tarballs, and print an offline-verifiable Ed25519 signed receipt with hash-chain evidence.
+Local clearance layer for autonomous software actions. V1 proves a package-install lifecycle gate: inspect before lifecycle execution, block poisoned lifecycle hooks from package directories or tarballs, and print an offline-verifiable Ed25519 signed receipt with hash-chain evidence.
 
 ## Commands
 
@@ -17,6 +17,8 @@ The demo generates a temporary marker-only package with a `postinstall.js` that 
 
 `customs-install` signs receipts with a persisted local issuer key. The default CLI key path is `$HOME/.customs/issuer-private.jwk.json` (or `%USERPROFILE%\.customs\issuer-private.jwk.json` on Windows), overrideable with `CUSTOMS_ISSUER_KEY_PATH` or `--issuer-key`. Missing keys fail closed unless `--create-issuer-key` is supplied for explicit bootstrap. The verifier receives only the exported public anchor at `artifacts/customs-issuer-public.jwk.json`; private keys must stay local.
 
+Production trust-root roadmap: this v1 proof uses a local persisted signer so judges can verify a stable, pinned trust anchor instead of a regenerated per-run key. The production control plane must move that issuer private key into managed key custody (KMS/HSM or equivalent), define key ownership/rotation, and distribute trusted public anchors through configuration before handling real customer clearance traffic.
+
 Delegation proofs are also fail-closed. A proof signature is verified only with a trusted delegation public key supplied out-of-band by `--trusted-delegation-public-key` or `delegationTrustPolicy`; the embedded `publicJwk` in the proof never grants trust by itself. The demo emits `artifacts/demo-delegation-public.jwk.json` as the public delegation anchor.
 
 ## Red-Team Proof Scope
@@ -29,6 +31,8 @@ Delegation proofs are also fail-closed. A proof signature is verified only with 
 - B5 import-time payload: Customs records this as an install-gate scope gap. A package with no lifecycle script is allowed by the install gate, then the control `require()` proves runtime execution still needs a later runtime/import boundary.
 - F2 receipt forgery: receipt verification requires a trusted issuer public key supplied outside the receipt. A self-signed attacker receipt with an embedded attacker key is rejected as `untrusted_issuer_key`, and a receipt whose embedded public key no longer matches its `keyId` is rejected as `receipt_public_key_mismatch`.
 - F4 delegation forgery: delegation verification requires a trusted delegation public key supplied outside the proof. A self-signed attacker proof with a fake issuer is rejected as `untrusted_delegation_issuer`, and key-id spoofing is rejected as `delegation_public_key_mismatch`.
+
+Pitch-safe claim: say "Customs gates install-lifecycle execution and blocks Clinejection/Nx-style poisoned lifecycle hooks before they run." Do not say "Customs blocks poisoned packages" without the lifecycle qualifier until a later runtime/import boundary exists.
 
 ## Kernel
 

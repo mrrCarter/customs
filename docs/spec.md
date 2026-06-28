@@ -4,7 +4,7 @@
 customs
 
 ## Goal
-Customs is a local clearance layer for autonomous software actions. The v1 proof blocks poisoned install-time package lifecycle hooks through a SentinelLayer install gate and prints a real offline-verifiable signed receipt backed by a hash chain.
+Customs is a local clearance layer for autonomous software actions. The v1 proof blocks poisoned install-time package lifecycle hooks through a SentinelLayer install gate and prints a real offline-verifiable signed receipt backed by a hash chain. The correct v1 claim is lifecycle scoped; runtime/import package execution remains a separate boundary.
 
 ## V1 Acceptance
 
@@ -15,11 +15,13 @@ Customs is a local clearance layer for autonomous software actions. The v1 proof
 - `npm run customs:verify-receipt -- artifacts/poisoned-install-receipt.json --trusted-public-key artifacts/customs-issuer-public.jwk.json` must verify offline against a trusted issuer key supplied outside the receipt.
 - The signing key must be stable across gate runs and independent of caller cwd. CLI installs use `$HOME/.customs/issuer-private.jwk.json` by default, with `CUSTOMS_ISSUER_KEY_PATH` or `--issuer-key` overrides.
 - Missing issuer private keys must fail closed unless the caller explicitly bootstraps with `--create-issuer-key` or `createIssuerKeyIfMissing: true`.
+- Production trust-root custody must be a follow-up before customer traffic: the local persisted signer must move to KMS/HSM or equivalent managed key custody with explicit ownership, rotation, and public-anchor distribution.
 - Delegation verification must fail closed unless the caller supplies a trusted delegation public key outside the proof (`--trusted-delegation-public-key` or `delegationTrustPolicy`).
 - The hash-chain record must link `previousHash` to `entryHash`; the first record uses the 64-zero genesis hash.
 - `customs-install` and `customs-verify-receipt` must emit structured JSON telemetry with `runId`, `traceId`, `correlationId`, span ids, `operation`, `status`, and `durationMs` for critical install, receipt issue/write/read/verify, and failure paths.
 - Red-team tests must prove p1 postinstall, p2 secret-scan, and B1 hook-alias payloads execute under ungated npm controls but do not execute through Customs treatment.
 - B5 import-time execution is out of scope for the install gate and must remain explicitly documented until a runtime/import boundary exists.
+- Marketing and demo material must say "install-lifecycle execution" and must not claim generic poisoned-package blocking without the lifecycle qualifier.
 - Self-signed forged receipts with attacker-controlled embedded public keys must be rejected as `untrusted_issuer_key`; mismatched embedded public-key metadata must be rejected as `receipt_public_key_mismatch`.
 - Self-signed forged delegations with attacker-controlled embedded public keys must be rejected as `untrusted_delegation_issuer`; delegation key-id spoofing must be rejected as `delegation_public_key_mismatch`.
 

@@ -58,3 +58,9 @@ V1 proves the smallest real loop:
 - Do not touch `../AIdenID`.
 - Do not fake crypto. Any failure in signing or verification blocks completion.
 - Keep PR scope limited to the local Customs scaffold and V1 proof.
+
+## Post-Hackathon Production Backlog
+
+- [ ] Move the receipt issuer private key from local file custody to KMS/HSM or equivalent managed key custody.
+- [ ] Define trust-root ownership, bootstrap ceremony, rotation cadence, and public-anchor distribution.
+- [ ] Build the runtime/import boundary before claiming generic poisoned-package blocking beyond install-lifecycle hooks.
