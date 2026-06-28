@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    steps:
+      # All third-party actions are pinned to immutable commit SHAs. Dependabot opens weekly update PRs.
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm run test:unit
+      - name: CLI and install-gate integration tests
+        run: npm run test:integration
+      - name: Red-team tarball corpus tests
+        run: npm run test:redteam
+      - name: Critical audit
+        run: npm run audit:critical
+      - name: Poisoned install proof
+        run: npm run demo:poisoned-install
+      - name: Verify receipt
+        run: npm run customs:verify-receipt -- artifacts/poisoned-install-receipt.json --trusted-public-key artifacts/customs-issuer-public.jwk.json
+      - name: Signed build provenance
+        run: npm run test:provenance
+      - name: Upload proof artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: customs-v1-proof
+          path: |
+            artifacts/poisoned-install-receipt.json
+            artifacts/customs-issuer-public.jwk.json
+            artifacts/demo-delegation-public.jwk.json
+            artifacts/customs-receipts.jsonl
+            artifacts/provenance/customs-build-provenance.json
+          if-no-files-found: error

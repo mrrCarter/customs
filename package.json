@@ -1,0 +1,45 @@
+{
+  "name": "customs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local clearance layer for autonomous software actions.",
+  "type": "module",
+  "bin": {
+    "customs-install": "./dist/src/cli/customs-install.js",
+    "customs-verify-receipt": "./dist/src/cli/verify-receipt.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "test:unit": "npm run build && node --test dist/tests/kernel.test.js",
+    "test:integration": "npm run build && node --test dist/tests/cli.test.js dist/tests/install-gate.test.js",
+    "test:redteam": "npm run build && node --test dist/tests/redteam-corpus.test.js",
+    "test:provenance": "npm run provenance:generate && npm run provenance:verify -- artifacts/provenance/customs-build-provenance.json",
+    "demo:poisoned-install": "npm run build && node dist/src/demo/runPoisonedInstall.js",
+    "customs:install": "node dist/src/cli/customs-install.js",
+    "customs:verify-receipt": "node dist/src/cli/verify-receipt.js",
+    "provenance:generate": "node scripts/generate-provenance.mjs",
+    "provenance:verify": "node scripts/verify-provenance.mjs",
+    "release:rollback:smoke": "node scripts/rollback-evidence.mjs --reason release-smoke-drill",
+    "release:smoke": "npm run typecheck && npm run test:unit && npm run test:integration && npm run test:redteam && npm run demo:poisoned-install && npm run customs:verify-receipt -- artifacts/poisoned-install-receipt.json --trusted-public-key artifacts/customs-issuer-public.jwk.json && npm run test:provenance && npm run release:rollback:smoke",
+    "audit:critical": "npm audit --audit-level=critical",
+    "sentinel:start": "echo \"Sentinelayer artifacts are ready. Open AGENT_HANDOFF_PROMPT.md and start your coding agent.\"",
+    "sentinel:omargate": "npx sentinelayer-cli@latest /omargate deep --path .",
+    "sentinel:omargate:json": "npx sentinelayer-cli@latest /omargate deep --path . --json",
+    "sentinel:audit": "npx sentinelayer-cli@latest /audit --path .",
+    "sentinel:audit:json": "npx sentinelayer-cli@latest /audit --path . --json",
+    "sentinel:persona:builder": "npx sentinelayer-cli@latest /persona orchestrator --mode builder --path .",
+    "sentinel:persona:reviewer": "npx sentinelayer-cli@latest /persona orchestrator --mode reviewer --path .",
+    "sentinel:persona:hardener": "npx sentinelayer-cli@latest /persona orchestrator --mode hardener --path .",
+    "sentinel:apply": "npx sentinelayer-cli@latest /apply --plan tasks/todo.md --path ."
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

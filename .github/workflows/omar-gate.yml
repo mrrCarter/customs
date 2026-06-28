@@ -1,0 +1,190 @@
+name: Omar Gate (BYOK Mode)
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: Sentinelayer scan profile
+        required: false
+        default: deep
+        type: choice
+        options:
+          - baseline
+          - deep
+          - audit
+          - full-depth
+      severity_gate:
+        description: Severity threshold that blocks merge
+        required: false
+        default: P1
+        type: choice
+        options:
+          - P0
+          - P1
+          - P2
+          - none
+      p2_max_allowed:
+        description: Maximum allowed P2 findings before Omar Gate blocks merge
+        required: false
+        default: "5"
+        type: string
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  omar_gate:
+    name: Omar Gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Validate Sentinelayer token secret
+        shell: bash
+        env:
+          SENTINELAYER_TOKEN: ${{ secrets.SENTINELAYER_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SENTINELAYER_TOKEN}" ]; then
+            echo "::warning::SENTINELAYER_TOKEN not set. Set it with: gh secret set SENTINELAYER_TOKEN --body <your-token>"
+            echo "Skipping Omar Gate scan — run locally with: npx sentinelayer-cli@latest /omargate deep --path ."
+            exit 0
+          fi
+      - name: Run Omar Gate
+        id: omar
+        uses: mrrCarter/sentinelayer-v1-action@03d7369cba7de2e9f15b959275c982111f0ee493
+        with:
+          github_token: ${{ github.token }}
+          sentinelayer_token: ${{ secrets.SENTINELAYER_TOKEN }}
+          sentinelayer_managed_llm: "false"
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          scan_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_mode || 'deep' }}
+          severity_gate: ${{ github.event_name == 'workflow_dispatch' && inputs.severity_gate || 'P1' }}
+          model: gpt-5.3-codex
+          codex_model: gpt-5.3-codex
+          model_fallback: gemini-2.5-flash
+          llm_failure_policy: block
+      - name: Enforce Omar reviewer merge thresholds
+        shell: bash
+        env:
+          P0_COUNT: ${{ steps.omar.outputs.p0_count || '0' }}
+          P1_COUNT: ${{ steps.omar.outputs.p1_count || '0' }}
+          P2_COUNT: ${{ steps.omar.outputs.p2_count || '0' }}
+          P2_MAX_ALLOWED: ${{ github.event_name == 'workflow_dispatch' && inputs.p2_max_allowed || '5' }}
+        run: |
+          set -euo pipefail
+          p0="$(echo "${P0_COUNT}" | tr -d '\r' | xargs || true)"
+          p1="$(echo "${P1_COUNT}" | tr -d '\r' | xargs || true)"
+          p2="$(echo "${P2_COUNT}" | tr -d '\r' | xargs || true)"
+          p2_max="$(echo "${P2_MAX_ALLOWED}" | tr -d '\r' | xargs || true)"
+          case "${p0}" in ''|*[!0-9]*) echo "::error::Invalid P0 count" ; exit 1 ;; esac
+          case "${p1}" in ''|*[!0-9]*) echo "::error::Invalid P1 count" ; exit 1 ;; esac
+          case "${p2}" in ''|*[!0-9]*) echo "::error::Invalid P2 count" ; exit 1 ;; esac
+          case "${p2_max}" in ''|*[!0-9]*) echo "::error::Invalid p2_max" ; exit 1 ;; esac
+          if [ "${p0}" -gt 0 ] || [ "${p1}" -gt 0 ]; then
+            echo "::error::Omar Gate blocked: P0=${p0}, P1=${p1}. Requires P0=0 and P1=0."
+            exit 1
+          fi
+          if [ "${p2}" -gt "${p2_max}" ]; then
+            echo "::error::Omar Gate blocked: P2=${p2} exceeds max ${p2_max}."
+            exit 1
+          fi
+      - name: Emit Omar run summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "## Omar Gate" >> "$GITHUB_STEP_SUMMARY"
+          echo "- run_id: \`${{ steps.omar.outputs.run_id }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- gate_status: \`${{ steps.omar.outputs.gate_status }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- findings: P0=${{ steps.omar.outputs.p0_count }} P1=${{ steps.omar.outputs.p1_count }} P2=${{ steps.omar.outputs.p2_count }} P3=${{ steps.omar.outputs.p3_count }}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Stage Omar summary artifact
+        shell: bash
+        env:
+          OMAR_RUN_ID: ${{ steps.omar.outputs.run_id || '' }}
+          OMAR_GATE_STATUS: ${{ steps.omar.outputs.gate_status || '' }}
+          OMAR_P0: ${{ steps.omar.outputs.p0_count || '0' }}
+          OMAR_P1: ${{ steps.omar.outputs.p1_count || '0' }}
+          OMAR_P2: ${{ steps.omar.outputs.p2_count || '0' }}
+          OMAR_P3: ${{ steps.omar.outputs.p3_count || '0' }}
+          OMAR_SCAN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_mode || 'deep' }}
+          OMAR_SEVERITY_GATE: ${{ github.event_name == 'workflow_dispatch' && inputs.severity_gate || 'P1' }}
+          OMAR_P2_MAX_ALLOWED: ${{ github.event_name == 'workflow_dispatch' && inputs.p2_max_allowed || '5' }}
+        run: |
+          set -euo pipefail
+          mkdir -p omar-artifacts
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          def env(name, default=""):
+              return os.environ.get(name, default)
+
+          def int_env(name):
+              value = env(name, "0").strip()
+              return int(value) if value.isdigit() else 0
+
+          github_run_id = env("GITHUB_RUN_ID")
+          server_url = env("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
+          repository = env("GITHUB_REPOSITORY")
+          run_url = f"{server_url}/{repository}/actions/runs/{github_run_id}" if repository and github_run_id else ""
+          summary = {
+              "schema_version": 1,
+              "kind": "omar_gate_summary",
+              "run_id": env("OMAR_RUN_ID"),
+              "gate_status": env("OMAR_GATE_STATUS"),
+              "findings": {
+                  "P0": int_env("OMAR_P0"),
+                  "P1": int_env("OMAR_P1"),
+                  "P2": int_env("OMAR_P2"),
+                  "P3": int_env("OMAR_P3"),
+              },
+              "threshold": {
+                  "severity_gate": env("OMAR_SEVERITY_GATE", "P1"),
+                  "p2_max_allowed": int_env("OMAR_P2_MAX_ALLOWED"),
+              },
+              "scan": {
+                  "mode": env("OMAR_SCAN_MODE", "deep"),
+                  "action_ref": "mrrCarter/sentinelayer-v1-action@03d7369cba7de2e9f15b959275c982111f0ee493",
+                  "managed_llm": False,
+                  "llm_failure_policy": "block",
+              },
+              "github": {
+                  "repository": repository,
+                  "sha": env("GITHUB_SHA"),
+                  "ref": env("GITHUB_REF"),
+                  "event_name": env("GITHUB_EVENT_NAME"),
+                  "workflow": env("GITHUB_WORKFLOW"),
+                  "run_id": github_run_id,
+                  "run_attempt": env("GITHUB_RUN_ATTEMPT"),
+                  "run_url": run_url,
+              },
+          }
+          Path("omar-artifacts/summary.json").write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + "
+",
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload Omar summary artifact
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874
+        with:
+          name: omar-gate-artifacts
+          path: omar-artifacts/summary.json
+          if-no-files-found: error
