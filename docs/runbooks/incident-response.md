@@ -24,6 +24,18 @@ Customs v1 is fail-closed. To stop trust in new receipts:
 6. Disable `customs-install` in the caller path and require manual package review.
 7. Treat every receipt signed by the revoked key as untrusted unless a separate incident review explicitly blesses it.
 
+Capture rollback evidence immediately:
+
+```bash
+npm run release:rollback:smoke
+```
+
+When the repository has a GitHub remote, dispatch the rollback workflow with the previous signed evidence artifact or release id:
+
+```bash
+gh workflow run rollback.yml -f target_artifact=<previous-signed-evidence-artifact> -f reason=<incident-id>
+```
+
 ## Containment
 
 Preserve evidence before cleanup:
@@ -61,6 +73,19 @@ If the external red-team corpus is available, also run:
 node C:/tmp/redteam-customs/rt-attack.mjs
 node C:/tmp/redteam-customs/rt-retest-f2.mjs
 ```
+
+## Rollback Verification
+
+Rollback is not complete until these checks pass:
+
+```bash
+npm run release:rollback:smoke
+npm run test:provenance
+npm run demo:poisoned-install
+npm run customs:verify-receipt -- artifacts/poisoned-install-receipt.json --trusted-public-key artifacts/customs-issuer-public.jwk.json
+```
+
+Expected rollback evidence is `artifacts/rollback.json` with `ok: true`, the selected target artifact, and the incident reason. Preserve that file with the incident record.
 
 ## Recovery Criteria
 
