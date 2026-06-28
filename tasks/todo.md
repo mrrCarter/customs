@@ -53,6 +53,7 @@ V1 proves the smallest real loop:
 - [x] Address Omar P1 release-hardening follow-up: GitHub Actions SHA maintenance via Dependabot, pinned GitHub provenance attestation, executable rollback script, and manual rollback workflow.
 - [x] Rerun proof after F4: `npm run typecheck`, `npm test` (19/19), `npm run release:smoke`, `npm run audit:critical` (0 vulnerabilities), external red-team F2/F2b/F4 repros, and Omar `omargate-1782686585127-89134176` (P0=0, P1=0, blocking=false).
 - [x] Address hosted Omar P2 follow-up: run PR Omar in SentinelLayer-managed mode without provider BYOK secrets, enforce main-only artifact release dispatch, add production-canary promotion, and set `ignore-scripts=true` for dependency installs. Verification: `npm ci`, `npm run release:smoke`, `npm run audit:critical`, `git diff --check`, local Omar `omargate-1782687971143-492fe8eb` P0=0/P1=0/blocking=false; AI-only P2/P3 notes cited non-existent mutable action tags, `npm publish`, and `deploy.sh`.
+- [x] Hotfix post-merge release workflow parse failure: convert promotion gate one-line `run:` commands containing `: ` into block scalars. Verification: `npx --yes js-yaml .github/workflows/release.yml`, `npm run release:smoke`, `npm run audit:critical`, `git diff --check`, and PR #2 hosted `quality-gates`/`Omar Gate` pass.
 
 ## Notes
 

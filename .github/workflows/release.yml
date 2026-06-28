@@ -73,7 +73,8 @@ jobs:
     environment: staging
     steps:
       - name: Staging promotion gate
-        run: echo "Artifact-only release: staging gate passed after signed local proof."
+        run: |
+          echo "Artifact-only release: staging gate passed after signed local proof."
 
   production-canary-smoke:
     needs: staging-smoke
@@ -81,7 +82,8 @@ jobs:
     environment: production-canary
     steps:
       - name: Production canary promotion gate
-        run: echo "Artifact-only release: production canary gate passed before full promotion."
+        run: |
+          echo "Artifact-only release: production canary gate passed before full promotion."
 
   production-smoke:
     needs: production-canary-smoke
@@ -89,7 +91,8 @@ jobs:
     environment: production
     steps:
       - name: Production promotion gate
-        run: echo "Artifact-only release: no cloud deploy in v1; promotion requires prior gates."
+        run: |
+          echo "Artifact-only release: no cloud deploy in v1; promotion requires prior gates."
 
   rollback-evidence:
     if: failure()
