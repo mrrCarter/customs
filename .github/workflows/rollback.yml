@@ -1,0 +1,39 @@
+name: Artifact Rollback Drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_artifact:
+        description: "Previous signed evidence artifact or release identifier to retain"
+        required: true
+        default: "previous-signed-evidence-artifact"
+      reason:
+        description: "Rollback reason"
+        required: true
+        default: "manual-rollback-drill"
+
+permissions:
+  contents: read
+
+jobs:
+  record-rollback:
+    runs-on: ubuntu-latest
+    steps:
+      # All third-party actions are pinned to immutable commit SHAs. Dependabot opens weekly update PRs.
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Record rollback evidence
+        run: node scripts/rollback-evidence.mjs --target "${{ inputs.target_artifact }}" --reason "${{ inputs.reason }}"
+      - name: Upload rollback evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: customs-rollback-evidence
+          path: artifacts/rollback.json
+          if-no-files-found: error
