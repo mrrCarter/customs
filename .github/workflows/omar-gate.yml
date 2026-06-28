@@ -177,8 +177,7 @@ jobs:
               },
           }
           Path("omar-artifacts/summary.json").write_text(
-              json.dumps(summary, indent=2, sort_keys=True) + "
-",
+              json.dumps(summary, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
           PY
