@@ -9,6 +9,7 @@ npm install
 npm test
 npm run demo:poisoned-install
 npm run customs:install -- ./package.tgz --delegation ./delegation.json --trusted-delegation-public-key ./delegation-public.jwk.json --receipt ./receipt.json --chain ./chain.jsonl --create-issuer-key --keep-staging
+npm run customs:mcp
 npm run customs:verify-receipt -- artifacts/poisoned-install-receipt.json --trusted-public-key artifacts/customs-issuer-public.jwk.json
 npm run release:smoke
 ```
@@ -42,8 +43,18 @@ Pitch-safe claim: say "Customs gates install-lifecycle execution and blocks Clin
 - Ed25519 compact JWS receipt.
 - Append-only hash-chain record.
 
+## MCP Decision Tools
+
+`customs-mcp` exposes the real kernel over stdio JSON-RPC for MCP clients:
+
+- `customs_clear_install`: evaluates package install intent and returns allow/deny plus a signed receipt before lifecycle execution.
+- `customs_verify_receipt`: verifies a receipt against a trusted issuer public key.
+- `search` / `fetch`: discovery shims for MCP hosts that require them.
+
+The MCP server is a decision surface only. It does not run `npm install`, execute lifecycle scripts, or trust an embedded delegation key. By default it loads a persisted receipt issuer from `CUSTOMS_MCP_ISSUER_KEY_PATH`, `CUSTOMS_ISSUER_KEY_PATH`, or `$HOME/.customs/issuer-private.jwk.json`; missing issuer keys fail closed unless `CUSTOMS_MCP_CREATE_ISSUER_KEY=1` is set for explicit bootstrap. A trusted delegation issuer can be supplied with `CUSTOMS_TRUSTED_DELEGATION_JWK`.
+
 ## Project Structure
 
-`src/kernel` contains the decision kernel. `src/adapters/slInstallGate.ts` is the install enforcement adapter. `src/cli` exposes local commands.
+`src/kernel` contains the decision kernel. `src/adapters/slInstallGate.ts` is the install enforcement adapter. `src/cli` exposes local commands. `src/mcp/server.ts` exposes the decision tools to MCP clients.
 
 Operational release, kill-switch, rollback, and incident steps live in `docs/operations.md` and `docs/runbooks/incident-response.md`. CI and release-blocking test coverage is mapped in `docs/ci-quality-gates.md`.
