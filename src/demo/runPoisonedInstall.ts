@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from "node:crypto";
 import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,10 +24,17 @@ async function main(): Promise<void> {
   const delegationPath = resolve(root, "artifacts/demo-delegation.json");
   const delegationPublicJwkPath = resolve(root, "artifacts/demo-delegation-public.jwk.json");
   const receiptPath = resolve(root, "artifacts/poisoned-install-receipt.json");
-  const issuerKeyPath = resolve(root, "artifacts/customs-issuer-private.jwk.json");
+  const issuerKeyPath = resolve(
+    process.env.CUSTOMS_DEMO_ISSUER_KEY_PATH ??
+      process.env.CUSTOMS_ISSUER_KEY_PATH ??
+      join(homedir(), ".customs", "demo-issuer-private.jwk.json")
+  );
   const issuerPublicJwkPath = resolve(root, "artifacts/customs-issuer-public.jwk.json");
   const chainPath = resolve(root, "artifacts/customs-receipts.jsonl");
   await mkdir(packageDir, { recursive: true });
+
+  // The demo never invokes npm install; it creates a local marker package and
+  // asks Customs to inspect it before any lifecycle hook can execute.
   await writeFile(
     resolve(packageDir, "package.json"),
     `${JSON.stringify({

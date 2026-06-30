@@ -23,4 +23,4 @@ Customs v1 treats the install gate, receipt verifier, red-team corpus, and prove
 
 ## Artifact Boundary
 
-Generated `artifacts/` output is ignored by git. CI uploads only evidence artifacts: receipts, public issuer key, public delegation key, receipt chain, provenance, and rollback evidence when applicable. Private issuer and delegation keys remain local runtime state, default to `$HOME/.customs/issuer-private.jwk.json` for CLI receipt signing, and must not be uploaded or committed.
+Generated `artifacts/` output is ignored by git. CI uploads only evidence artifacts: receipts, public issuer key, public delegation key, receipt chain, provenance, and rollback evidence when applicable. Private issuer and delegation keys remain local runtime state, default to `$HOME/.customs/issuer-private.jwk.json` for CLI receipt signing and `$HOME/.customs/demo-issuer-private.jwk.json` for the poisoned-install demo, and must not be uploaded or committed.
