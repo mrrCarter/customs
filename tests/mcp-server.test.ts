@@ -58,6 +58,35 @@ function callTool<T>(server: CustomsMcpServer, name: string, args: unknown): T {
   }));
 }
 
+const mcpInstallTimePayloads: readonly {
+  readonly name: string;
+  readonly scripts: Readonly<Record<string, string>>;
+  readonly expectedHooks: readonly string[];
+  readonly expectedReason: string;
+}[] = [
+  {
+    name: "openclaw",
+    scripts: { postinstall: "node postinstall.js" },
+    expectedHooks: ["postinstall"],
+    expectedReason: "poisoned_postinstall_detected"
+  },
+  {
+    name: "nx-telemetry-replay",
+    scripts: { postinstall: "node telemetry.js" },
+    expectedHooks: ["postinstall"],
+    expectedReason: "poisoned_postinstall_detected"
+  },
+  {
+    name: "openclaw-pro",
+    scripts: {
+      preinstall: "node hook.js preinstall",
+      prepare: "node hook.js prepare"
+    },
+    expectedHooks: ["preinstall", "prepare"],
+    expectedReason: "lifecycle_script_detected"
+  }
+];
+
 test("Customs MCP initializes and exposes clearance tools", () => {
   const proof = delegationProof();
   const server = serverForTrustedProof(proof);
@@ -104,6 +133,35 @@ test("customs_clear_install denies poisoned lifecycle scripts and returns a veri
   });
   assert.equal(mcpVerification.ok, true);
   assert.equal(mcpVerification.decision, "deny");
+});
+
+test("customs_clear_install blocks install-time red-team payload surfaces through MCP", () => {
+  for (const fixture of mcpInstallTimePayloads) {
+    const proof = delegationProof({ jti: `mcp-redteam-${fixture.name}` });
+    const server = serverForTrustedProof(proof);
+    const result = callTool<{
+      readonly decision: string;
+      readonly blocked: boolean;
+      readonly reasons: readonly string[];
+      readonly lifecycleFindings: readonly { readonly name: string; readonly command: string }[];
+      readonly receipt: SignedInstallReceipt;
+      readonly issuerPublicJwk: SignedInstallReceipt["publicJwk"];
+    }>(server, "customs_clear_install", {
+      packageName: fixture.name,
+      packageVersion: "1.0.0",
+      scripts: fixture.scripts,
+      delegationProof: proof
+    });
+
+    assert.equal(result.decision, "deny");
+    assert.equal(result.blocked, true);
+    assert.ok(result.reasons.includes(fixture.expectedReason));
+    assert.ok(result.reasons.includes("permission_scope_mismatch"));
+    for (const hook of fixture.expectedHooks) {
+      assert.ok(result.lifecycleFindings.some((finding) => finding.name === hook), `${fixture.name} should flag ${hook}`);
+    }
+    assert.equal(verifyReceipt(result.receipt, { trustedPublicJwks: [result.issuerPublicJwk] }).ok, true);
+  }
 });
 
 test("Customs MCP allows clean installs only with trusted delegation", () => {

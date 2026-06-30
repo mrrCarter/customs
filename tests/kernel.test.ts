@@ -120,6 +120,27 @@ test("policy engine exposes the six-outcome ladder and blocks poisoned postinsta
   assert.ok(decision.reasons.includes("permission_scope_mismatch"));
 });
 
+test("policy engine blocks prepare hook aliases", () => {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const proof = createDelegationProof({ claims: claims(), privateKey, publicKey });
+  const delegation = verifyDelegationProof(proof, {
+    expectedAudience: "customs.install",
+    requiredScopes: ["package:install"],
+    trustPolicy: delegationTrustPolicyForPublicJwk(proof.publicJwk)
+  });
+  const decision = evaluateInstall({
+    packageName: "@demo/prepare-alias",
+    scripts: { prepare: "node hook.js prepare" },
+    delegation
+  });
+
+  assert.equal(decision.decision, "deny");
+  assert.equal(decision.blocked, true);
+  assert.ok(decision.reasons.includes("lifecycle_script_detected"));
+  assert.ok(decision.reasons.includes("permission_scope_mismatch"));
+  assert.ok(decision.lifecycleFindings.some((finding) => finding.name === "prepare"));
+});
+
 test("signed receipts verify offline and fail on tampering", () => {
   const decision = evaluateInstall({
     packageName: "@demo/safe",

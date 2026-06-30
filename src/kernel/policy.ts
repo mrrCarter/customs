@@ -71,7 +71,7 @@ export interface InstallDecision {
 
 const DEFAULT_POLICY: InstallPolicy = {
   mode: "enforce",
-  deniedLifecycleScripts: ["preinstall", "install", "postinstall"],
+  deniedLifecycleScripts: ["preinstall", "install", "postinstall", "prepare"],
   suspiciousScriptTokens: ["curl", "wget", "Invoke-WebRequest", "powershell", "rm -rf", "bash -c", "node -e"],
   packageOverrides: []
 };
