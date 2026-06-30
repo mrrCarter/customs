@@ -287,7 +287,7 @@ export class CustomsMcpServer {
     };
   }
 
-  fetch(args: unknown): unknown {
+  fetchCapability(args: unknown): unknown {
     const input = objectRecord(args, "fetch arguments");
     if (typeof input.id !== "string") {
       throw new Error("id is required");
@@ -337,7 +337,7 @@ export class CustomsMcpServer {
           return toolResult(id, this.search(args));
         }
         if (params.name === "fetch") {
-          return toolResult(id, this.fetch(args));
+          return toolResult(id, this.fetchCapability(args));
         }
         return errorResponse(id, -32601, `unknown tool ${params.name}`);
       }
