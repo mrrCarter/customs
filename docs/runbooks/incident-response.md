@@ -87,7 +87,7 @@ Preserve evidence before cleanup:
 - `.sentinelayer/reviews/`
 - the package tarball or package directory that triggered the incident
 
-Do not upload or paste any private issuer key, including demo-local `artifacts/customs-issuer-private.jwk.json`. Do not upload or paste delegation private keys.
+Do not upload or paste any private issuer key, including demo-local `$HOME/.customs/demo-issuer-private.jwk.json` or a path supplied through `CUSTOMS_DEMO_ISSUER_KEY_PATH` / `CUSTOMS_ISSUER_KEY_PATH`. Do not upload or paste delegation private keys.
 
 ## Verification Checks
 

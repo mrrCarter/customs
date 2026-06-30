@@ -18,6 +18,8 @@ The demo generates a temporary marker-only package with a `postinstall.js` that 
 
 `customs-install` signs receipts with a persisted local issuer key. The default CLI key path is `$HOME/.customs/issuer-private.jwk.json` (or `%USERPROFILE%\.customs\issuer-private.jwk.json` on Windows), overrideable with `CUSTOMS_ISSUER_KEY_PATH` or `--issuer-key`. Missing keys fail closed unless `--create-issuer-key` is supplied for explicit bootstrap. The verifier receives only the exported public anchor at `artifacts/customs-issuer-public.jwk.json`; private keys must stay local.
 
+The poisoned-install demo uses `$HOME/.customs/demo-issuer-private.jwk.json` by default, overrideable with `CUSTOMS_DEMO_ISSUER_KEY_PATH` or `CUSTOMS_ISSUER_KEY_PATH`. It writes only public/verifiable evidence under `artifacts/`.
+
 Production trust-root roadmap: this v1 proof uses a local persisted signer so judges can verify a stable, pinned trust anchor instead of a regenerated per-run key. The production control plane must move that issuer private key into managed key custody (KMS/HSM or equivalent), define key ownership/rotation, and distribute trusted public anchors through configuration before handling real customer clearance traffic.
 
 Delegation proofs are also fail-closed. A proof signature is verified only with a trusted delegation public key supplied out-of-band by `--trusted-delegation-public-key` or `delegationTrustPolicy`; the embedded `publicJwk` in the proof never grants trust by itself. The demo emits `artifacts/demo-delegation-public.jwk.json` as the public delegation anchor.

@@ -41,7 +41,7 @@ Operational issuer state:
 
 - `$HOME/.customs/issuer-private.jwk.json` is the default persisted local signing key. Operators may override it with `CUSTOMS_ISSUER_KEY_PATH` or `--issuer-key`.
 - Missing issuer keys fail closed unless the caller explicitly bootstraps with `--create-issuer-key`.
-- Demo runs may create `artifacts/customs-issuer-private.jwk.json` as local ignored runtime state. It must not be uploaded as release evidence or distributed to verifiers.
+- Demo runs may create `$HOME/.customs/demo-issuer-private.jwk.json` (or the path from `CUSTOMS_DEMO_ISSUER_KEY_PATH` / `CUSTOMS_ISSUER_KEY_PATH`) as local runtime state. It must not be uploaded as release evidence or distributed to verifiers.
 - Verifiers pin only `artifacts/customs-issuer-public.jwk.json`.
 - If the private key is rotated, regenerate the public anchor and invalidate old receipts unless the verifier explicitly trusts both old and new keys.
 - Production readiness requires replacing the local file signer with managed key custody such as KMS/HSM, plus documented owner, rotation cadence, bootstrap ceremony, and public-anchor distribution. The local persisted key is acceptable for the hackathon proof because it is stable and pinnable; it is not the final customer trust-root design.
