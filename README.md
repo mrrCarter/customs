@@ -49,7 +49,7 @@ Pitch-safe claim: say "Customs gates install-lifecycle execution and blocks Clin
 
 `customs-mcp` exposes the real kernel over stdio JSON-RPC for MCP clients:
 
-- `customs_clear_install`: evaluates package install intent and returns allow/deny plus a signed receipt before lifecycle execution.
+- `customs_clear_install`: stages and inspects a real package reference (a `.tgz` tarball or a package directory) with lifecycle scripts disabled — it derives the decision from the package's own manifest, never from caller-declared scripts — then returns allow/deny plus a signed receipt before lifecycle execution.
 - `customs_verify_receipt`: verifies a receipt against a trusted issuer public key.
 - `search` / `fetch`: discovery shims for MCP hosts that require them.
 

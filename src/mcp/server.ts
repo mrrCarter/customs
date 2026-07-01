@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
-import { homedir } from "node:os";
+import { mkdtemp, rm } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { runSlInstallGate } from "../adapters/slInstallGate.js";
 import type { DelegationProof, DelegationTrustPolicy } from "../kernel/delegation.js";
-import { delegationKeyIdForPublicJwk, verifyDelegationProof } from "../kernel/delegation.js";
+import { delegationKeyIdForPublicJwk } from "../kernel/delegation.js";
 import { loadOrCreateLocalReceiptIssuer } from "../kernel/issuerKeyStore.js";
-import { defaultInstallPolicy, evaluateInstall, type InstallDecision, type InstallPolicy } from "../kernel/policy.js";
+import { defaultInstallPolicy, type InstallDecision, type InstallPolicy } from "../kernel/policy.js";
 import { LocalReceiptIssuer, verifyReceipt, type ReceiptTrustPolicy, type SignedInstallReceipt } from "../kernel/receipts.js";
 import type { PublicJwk } from "../kernel/crypto.js";
 
@@ -55,6 +57,8 @@ export interface CustomsClearInstallResult {
   readonly reasons: readonly string[];
   readonly actorClass: string;
   readonly lifecycleFindings: InstallDecision["lifecycleFindings"];
+  readonly inspectedPackage: string;
+  readonly stagedWithIgnoreScripts: boolean;
   readonly receipt: SignedInstallReceipt;
   readonly issuerPublicJwk: PublicJwk;
 }
@@ -79,16 +83,13 @@ export const CUSTOMS_MCP_TOOLS: readonly ToolDefinition[] = [
     name: "customs_clear_install",
     title: "Customs: clear a package install",
     description:
-      "Route a package-install action through the real Customs clearance kernel. Returns allow/deny plus a signed offline-verifiable receipt before lifecycle execution.",
+      "Route a package-install action through the real Customs clearance kernel. Pass a packageRef (a .tgz tarball path or a package directory); Customs STAGES and INSPECTS the real package with lifecycle scripts disabled — it does NOT trust caller-declared scripts, so a caller cannot omit a poisoned postinstall to be cleared. Returns allow/deny plus a signed offline-verifiable receipt before lifecycle execution.",
     inputSchema: {
       type: "object",
       properties: {
-        packageName: { type: "string" },
-        packageVersion: { type: "string" },
-        scripts: {
-          type: "object",
-          additionalProperties: { type: "string" },
-          description: "package.json scripts map"
+        packageRef: {
+          type: "string",
+          description: "path to a package tarball (.tgz) or a package directory; the REAL package is staged (npm install --ignore-scripts) and inspected — caller-declared scripts are never trusted"
         },
         delegationProof: {
           type: "object",
@@ -96,7 +97,7 @@ export const CUSTOMS_MCP_TOOLS: readonly ToolDefinition[] = [
           description: "Ed25519 AIdenID/Customs delegation proof"
         }
       },
-      required: ["packageName"]
+      required: ["packageRef"]
     },
     annotations: { readOnlyHint: true, destructiveHint: false },
     security: { requires_human_approval: false, scopes: ["customs.install.clear"] }
@@ -157,21 +158,6 @@ function objectRecord(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function optionalStringMap(value: unknown, label: string): Readonly<Record<string, string>> {
-  if (value === undefined) {
-    return {};
-  }
-  const input = objectRecord(value, label);
-  const output: Record<string, string> = {};
-  for (const [key, item] of Object.entries(input)) {
-    if (typeof item !== "string") {
-      throw new Error(`${label}.${key} must be a string`);
-    }
-    output[key] = item;
-  }
-  return output;
-}
-
 function optionalDelegationProof(value: unknown): DelegationProof | undefined {
   if (value === undefined) {
     return undefined;
@@ -230,37 +216,40 @@ export class CustomsMcpServer {
     this.installPolicy = options.installPolicy ?? defaultInstallPolicy();
   }
 
-  clearInstall(args: unknown): CustomsClearInstallResult {
+  async clearInstall(args: unknown): Promise<CustomsClearInstallResult> {
     const input = objectRecord(args, "customs_clear_install arguments");
-    if (typeof input.packageName !== "string" || input.packageName.length === 0) {
-      throw new Error("packageName is required");
+    if (typeof input.packageRef !== "string" || input.packageRef.length === 0) {
+      throw new Error("packageRef is required (a package tarball path or directory to stage + inspect)");
     }
-    const packageVersion = input.packageVersion;
-    if (packageVersion !== undefined && typeof packageVersion !== "string") {
-      throw new Error("packageVersion must be a string");
+    // Stage + inspect the REAL package (lifecycle scripts disabled). The decision is derived from the
+    // package's own manifest — never from caller-declared scripts — so a caller cannot omit a poisoned
+    // postinstall to be cleared. Receipt + chain are written to a throwaway scratch dir.
+    const scratch = await mkdtemp(join(tmpdir(), "customs-mcp-clear-"));
+    try {
+      const result = await runSlInstallGate({
+        packageDir: input.packageRef,
+        delegationProof: optionalDelegationProof(input.delegationProof),
+        delegationTrustPolicy: this.delegationTrustPolicy,
+        policy: this.installPolicy,
+        receiptPath: join(scratch, "receipt.json"),
+        chainPath: join(scratch, "chain.jsonl"),
+        receiptIssuer: this.receiptIssuer
+      });
+      const decision = result.decision;
+      return {
+        decision: decision.decision,
+        blocked: decision.blocked,
+        reasons: decision.reasons,
+        actorClass: decision.actorClass,
+        lifecycleFindings: decision.lifecycleFindings,
+        inspectedPackage: decision.packageName,
+        stagedWithIgnoreScripts: result.source.stagedWithIgnoreScripts,
+        receipt: result.receipt,
+        issuerPublicJwk: this.receiptIssuer.trustedPublicJwk()
+      };
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
     }
-    const delegation = verifyDelegationProof(optionalDelegationProof(input.delegationProof), {
-      expectedAudience: "customs.install",
-      requiredScopes: ["package:install"],
-      trustPolicy: this.delegationTrustPolicy
-    });
-    const decision = evaluateInstall({
-      packageName: input.packageName,
-      ...(packageVersion === undefined ? {} : { packageVersion }),
-      scripts: optionalStringMap(input.scripts, "scripts"),
-      delegation,
-      policy: this.installPolicy
-    });
-    const receipt = this.receiptIssuer.issue(decision);
-    return {
-      decision: decision.decision,
-      blocked: decision.blocked,
-      reasons: decision.reasons,
-      actorClass: decision.actorClass,
-      lifecycleFindings: decision.lifecycleFindings,
-      receipt,
-      issuerPublicJwk: this.receiptIssuer.trustedPublicJwk()
-    };
   }
 
   verifyReceipt(args: unknown): ReturnType<typeof verifyReceipt> {
@@ -304,7 +293,7 @@ export class CustomsMcpServer {
     };
   }
 
-  handle(message: JsonRpcRequest): JsonRpcResponse | null {
+  async handle(message: JsonRpcRequest): Promise<JsonRpcResponse | null> {
     const id = jsonRpcId(message.id);
     try {
       if (message.method === "initialize") {
@@ -314,7 +303,7 @@ export class CustomsMcpServer {
           result: {
             protocolVersion: CUSTOMS_MCP_PROTOCOL_VERSION,
             capabilities: { tools: {} },
-            serverInfo: { name: "customs-mcp", version: "0.1.0" }
+            serverInfo: { name: "customs-mcp", version: "0.2.0" }
           }
         };
       }
@@ -328,7 +317,7 @@ export class CustomsMcpServer {
         }
         const args = params.arguments ?? {};
         if (params.name === "customs_clear_install") {
-          return toolResult(id, this.clearInstall(args));
+          return toolResult(id, await this.clearInstall(args));
         }
         if (params.name === "customs_verify_receipt") {
           return toolResult(id, this.verifyReceipt(args));
@@ -368,6 +357,7 @@ export async function createDefaultCustomsMcpServer(env: NodeJS.ProcessEnv = pro
 export async function runCustomsMcpStdio(server?: CustomsMcpServer | undefined): Promise<void> {
   const activeServer = server ?? (await createDefaultCustomsMcpServer());
   const rl = createInterface({ input: process.stdin });
+  let pending: Promise<void> = Promise.resolve();
   rl.on("line", (line) => {
     const trimmed = line.trim();
     if (trimmed.length === 0) {
@@ -380,10 +370,20 @@ export async function runCustomsMcpStdio(server?: CustomsMcpServer | undefined):
       process.stdout.write(`${JSON.stringify(errorResponse(null, -32700, "parse error"))}\n`);
       return;
     }
-    const response = activeServer.handle(parsed);
-    if (response !== null) {
-      process.stdout.write(`${JSON.stringify(response)}\n`);
-    }
+    // Serialize handling so responses stay in request order even though handle() is async
+    // (a slow stage+inspect must not let a later fast request overtake it on stdout).
+    pending = pending
+      .then(async () => {
+        const response = await activeServer.handle(parsed);
+        if (response !== null) {
+          process.stdout.write(`${JSON.stringify(response)}\n`);
+        }
+      })
+      .catch((error: unknown) => {
+        process.stdout.write(
+          `${JSON.stringify(errorResponse(null, -32000, error instanceof Error ? error.message : String(error)))}\n`
+        );
+      });
   });
 }
 
